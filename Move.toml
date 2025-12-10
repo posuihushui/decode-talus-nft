@@ -1,0 +1,10 @@
+[package]
+name = "tally_nft"
+edition = "2024.beta"
+version = "1.0.0"
+
+[dependencies]
+Kiosk = { git = "https://github.com/MystenLabs/apps.git", subdir = "kiosk", rev = "main" }
+
+[addresses]
+tally_nft = "0x0"
