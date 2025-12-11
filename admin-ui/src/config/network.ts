@@ -14,17 +14,17 @@ export const NETWORK_CONFIG = {
   mainnet: {
     network: "mainnet" as const,
     rpcUrl: getFullnodeUrl("mainnet"),
-    packageId: "",
-    registryId: "",
-    attributesId: "",
-    transferPolicyId: "",
-    transferPolicyCapId: "",
-    adminCapId: "",
+    packageId: "0x75888defd3f392d276643932ae204cd85337a5b8f04335f9f912b6291149f423",
+    registryId: "0x9e9ca64999421d654a72ef7d257102e042cd6f8ea8202f36087ace43750c5d8f",
+    attributesId: "0x5ac88348dea35c6a3ac3db48b101564484186700f811a7048d86abadd7075cbc",
+    transferPolicyId: "0x143e29ba830c1ebdc79424a5c6f33d77f9f51751fbb0834fba61a66f395c2f0d",
+    transferPolicyCapId: "0xb2e93d192d7ea6842afcdaf86b0deccaf5423c21b88549b2d47f138921edf933",
+    adminCapId: "0xfbf56dd3e1451b69d1d6fd4234391bf8ac98f82ee0724a0a64228ad096e8af69",
   },
 };
 
 // Default network based on environment variable
-const defaultNetwork = (process.env.NEXT_PUBLIC_DEFAULT_NETWORK as "testnet" | "mainnet") || "testnet";
+export const defaultNetwork = (process.env.NEXT_PUBLIC_DEFAULT_NETWORK as "testnet" | "mainnet") || "testnet";
 
 // Export NETWORK for simpler usage
 export const NETWORK = NETWORK_CONFIG[defaultNetwork];
