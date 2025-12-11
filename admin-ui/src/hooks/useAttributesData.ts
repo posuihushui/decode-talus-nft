@@ -1,7 +1,7 @@
 "use client";
 
 import { useSuiClientQuery } from "@mysten/dapp-kit";
-import { NETWORK_CONFIG } from "@/config/network";
+import { NETWORK } from "@/config/network";
 
 export interface AttributesData {
   canReveal: boolean;
@@ -11,13 +11,13 @@ export function useAttributesData() {
   const { data, isLoading, error, refetch } = useSuiClientQuery(
     "getObject",
     {
-      id: NETWORK_CONFIG.testnet.attributesId,
+      id: NETWORK.attributesId,
       options: {
         showContent: true,
       },
     },
     {
-      enabled: !!NETWORK_CONFIG.testnet.attributesId,
+      enabled: !!NETWORK.attributesId,
     }
   );
 

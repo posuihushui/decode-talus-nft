@@ -1,7 +1,7 @@
 "use client";
 
 import { Transaction } from "@mysten/sui/transactions";
-import { NETWORK_CONFIG } from "@/config/network";
+import { NETWORK } from "@/config/network";
 import { useCallback } from "react";
 import { useExecuteTransaction } from "./useExecuteTransaction";
 
@@ -11,10 +11,10 @@ export function useTicketActions() {
   const distributeFreeTickets = useCallback(async (addresses: string[]) => {
     const tx = new Transaction();
     tx.moveCall({
-      target: `${NETWORK_CONFIG.testnet.packageId}::nft::distribute_free_tickets`,
+      target: `${NETWORK.packageId}::nft::distribute_free_tickets`,
       arguments: [
-        tx.object(NETWORK_CONFIG.testnet.adminCapId),
-        tx.object(NETWORK_CONFIG.testnet.registryId),
+        tx.object(NETWORK.adminCapId),
+        tx.object(NETWORK.registryId),
         tx.pure.vector("address", addresses),
       ],
     });
@@ -24,10 +24,10 @@ export function useTicketActions() {
   const distributeEarlyTickets = useCallback(async (addresses: string[]) => {
     const tx = new Transaction();
     tx.moveCall({
-      target: `${NETWORK_CONFIG.testnet.packageId}::nft::distribute_early_tickets`,
+      target: `${NETWORK.packageId}::nft::distribute_early_tickets`,
       arguments: [
-        tx.object(NETWORK_CONFIG.testnet.adminCapId),
-        tx.object(NETWORK_CONFIG.testnet.registryId),
+        tx.object(NETWORK.adminCapId),
+        tx.object(NETWORK.registryId),
         tx.pure.vector("address", addresses),
       ],
     });

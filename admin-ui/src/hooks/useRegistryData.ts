@@ -1,7 +1,7 @@
 "use client";
 
 import { useSuiClientQuery } from "@mysten/dapp-kit";
-import { NETWORK_CONFIG } from "@/config/network";
+import { NETWORK } from "@/config/network";
 
 export interface RegistryData {
   minted: number;
@@ -20,13 +20,13 @@ export function useRegistryData() {
   const { data, isLoading, error, refetch } = useSuiClientQuery(
     "getObject",
     {
-      id: NETWORK_CONFIG.testnet.registryId,
+      id: NETWORK.registryId,
       options: {
         showContent: true,
       },
     },
     {
-      enabled: !!NETWORK_CONFIG.testnet.registryId,
+      enabled: !!NETWORK.registryId,
     }
   );
 

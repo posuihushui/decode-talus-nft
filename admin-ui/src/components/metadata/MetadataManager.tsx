@@ -1,16 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Upload, Plus, Trash2 } from "lucide-react";
+import { Loader2, Upload, Plus, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useMetadataActions } from "@/hooks/useMetadataActions";
 import { useAttributesData } from "@/hooks/useAttributesData";
+
+// Validation helpers
+const isValidNftId = (id: string): boolean => {
+    const num = Number(id);
+    return !isNaN(num) && num >= 0 && Number.isInteger(num);
+};
+
+const isValidUrl = (url: string): boolean => {
+    try {
+        new URL(url);
+        return true;
+    } catch {
+        return url.startsWith("ipfs://") || url.startsWith("ar://");
+    }
+};
+
+const isValidTraitKey = (key: string): boolean => {
+    return key.trim().length > 0 && key.length <= 64;
+};
+
+const isValidTraitValue = (value: string): boolean => {
+    return value.trim().length > 0 && value.length <= 256;
+};
+
+interface ValidationError {
+    field: string;
+    message: string;
+}
 
 export function MetadataManager() {
     const { addAttributes, bulkAddAttributes, addUrl, bulkAddUrls, startRevealing } = useMetadataActions();
@@ -31,6 +59,55 @@ export function MetadataManager() {
     // Bulk URL State
     const [bulkUrls, setBulkUrls] = useState<{ id: string; url: string }[]>([]);
 
+    // Validation for single attributes
+    const attributeValidation = useMemo((): ValidationError[] => {
+        const errors: ValidationError[] = [];
+
+        if (nftId && !isValidNftId(nftId)) {
+            errors.push({ field: "nftId", message: "NFT ID must be a non-negative integer" });
+        }
+
+        attributes.forEach((attr, i) => {
+            if (attr.key && !isValidTraitKey(attr.key)) {
+                errors.push({ field: `trait-key-${i}`, message: `Trait ${i + 1} key must be 1-64 characters` });
+            }
+            if (attr.value && !isValidTraitValue(attr.value)) {
+                errors.push({ field: `trait-value-${i}`, message: `Trait ${i + 1} value must be 1-256 characters` });
+            }
+        });
+
+        return errors;
+    }, [nftId, attributes]);
+
+    // Validation for single URL
+    const urlValidation = useMemo((): ValidationError[] => {
+        const errors: ValidationError[] = [];
+
+        if (urlNftId && !isValidNftId(urlNftId)) {
+            errors.push({ field: "urlNftId", message: "NFT ID must be a non-negative integer" });
+        }
+
+        if (url && !isValidUrl(url)) {
+            errors.push({ field: "url", message: "Invalid URL format (must be http://, https://, ipfs://, or ar://)" });
+        }
+
+        return errors;
+    }, [urlNftId, url]);
+
+    const canSubmitAttributes = useMemo(() => {
+        return nftId &&
+            isValidNftId(nftId) &&
+            attributes.some(a => a.key && a.value) &&
+            attributes.every(a => (!a.key && !a.value) || (isValidTraitKey(a.key) && isValidTraitValue(a.value)));
+    }, [nftId, attributes]);
+
+    const canSubmitUrl = useMemo(() => {
+        return urlNftId &&
+            url &&
+            isValidNftId(urlNftId) &&
+            isValidUrl(url);
+    }, [urlNftId, url]);
+
     const handleAddAttributeField = () => {
         setAttributes([...attributes, { key: "", value: "" }]);
     };
@@ -46,11 +123,15 @@ export function MetadataManager() {
     };
 
     const handleSubmitSingleAttributes = async () => {
-        if (!nftId || attributes.length === 0) return;
+        if (!canSubmitAttributes) {
+            toast.error("Please fix validation errors before submitting");
+            return;
+        }
         setIsProcessing(true);
         try {
-            const keys = attributes.map(a => a.key);
-            const values = attributes.map(a => a.value);
+            const validAttrs = attributes.filter(a => a.key && a.value);
+            const keys = validAttrs.map(a => a.key.trim());
+            const values = validAttrs.map(a => a.value.trim());
             await addAttributes(Number(nftId), keys, values);
             setNftId("");
             setAttributes([{ key: "", value: "" }]);
@@ -68,30 +149,48 @@ export function MetadataManager() {
         Papa.parse(file, {
             header: true,
             complete: (results) => {
-                // Expected CSV format: nft_number, key1, value1, key2, value2... OR nft_number, trait_type, value
-                // Let's assume a simpler format: ID, Key, Value
-                // Or a "wide" format where columns are keys? Wide format is better for bulk.
-                // format: id, Background, Eyes, Mouth...
                 const parsed: { id: string; keys: string[]; values: string[] }[] = [];
+                const errors: string[] = [];
 
-                results.data.forEach((row: any) => {
-                    if (!row.id) return; // ID column is mandatory
+                results.data.forEach((row: any, rowIndex: number) => {
+                    if (!row.id) return;
+
+                    if (!isValidNftId(row.id)) {
+                        errors.push(`Row ${rowIndex + 1}: Invalid NFT ID "${row.id}"`);
+                        return;
+                    }
+
                     const id = row.id;
                     const keys: string[] = [];
                     const values: string[] = [];
 
                     Object.keys(row).forEach(header => {
                         if (header !== 'id' && row[header]) {
-                            keys.push(header);
-                            values.push(row[header]);
+                            if (!isValidTraitKey(header)) {
+                                errors.push(`Row ${rowIndex + 1}: Invalid trait key "${header}"`);
+                            } else if (!isValidTraitValue(row[header])) {
+                                errors.push(`Row ${rowIndex + 1}: Invalid trait value for "${header}"`);
+                            } else {
+                                keys.push(header);
+                                values.push(row[header]);
+                            }
                         }
                     });
                     if (keys.length > 0) {
                         parsed.push({ id, keys, values });
                     }
                 });
+
+                if (errors.length > 0) {
+                    toast.error(`${errors.length} validation errors found`, {
+                        description: errors.slice(0, 3).join("; ") + (errors.length > 3 ? "..." : ""),
+                    });
+                }
+
                 setBulkAttributes(parsed);
-                toast.success(`Parsed attributes for ${parsed.length} NFTs`);
+                if (parsed.length > 0) {
+                    toast.success(`Parsed attributes for ${parsed.length} NFTs`);
+                }
             }
         });
     };
@@ -100,7 +199,6 @@ export function MetadataManager() {
         if (bulkAttributes.length === 0) return;
         setIsProcessing(true);
         try {
-            // Flatten for API: array of IDs, array of Keys lists, array of Values lists
             const ids = bulkAttributes.map(b => Number(b.id));
             const keysList = bulkAttributes.map(b => b.keys);
             const valuesList = bulkAttributes.map(b => b.values);
@@ -114,10 +212,13 @@ export function MetadataManager() {
     };
 
     const handleSubmitSingleUrl = async () => {
-        if (!urlNftId || !url) return;
+        if (!canSubmitUrl) {
+            toast.error("Please fix validation errors before submitting");
+            return;
+        }
         setIsProcessing(true);
         try {
-            await addUrl(Number(urlNftId), url);
+            await addUrl(Number(urlNftId), url.trim());
             setUrlNftId("");
             setUrl("");
         } catch (e) {
@@ -134,15 +235,31 @@ export function MetadataManager() {
         Papa.parse(file, {
             header: false,
             complete: (results) => {
-                // Expected CSV: ID, URL
                 const parsed: { id: string; url: string }[] = [];
-                results.data.forEach((row: any) => {
+                const errors: string[] = [];
+
+                results.data.forEach((row: any, rowIndex: number) => {
                     if (row[0] && row[1]) {
-                        parsed.push({ id: row[0], url: row[1] });
+                        if (!isValidNftId(row[0])) {
+                            errors.push(`Row ${rowIndex + 1}: Invalid NFT ID "${row[0]}"`);
+                        } else if (!isValidUrl(row[1])) {
+                            errors.push(`Row ${rowIndex + 1}: Invalid URL "${row[1]}"`);
+                        } else {
+                            parsed.push({ id: row[0], url: row[1] });
+                        }
                     }
                 });
+
+                if (errors.length > 0) {
+                    toast.error(`${errors.length} validation errors found`, {
+                        description: errors.slice(0, 3).join("; ") + (errors.length > 3 ? "..." : ""),
+                    });
+                }
+
                 setBulkUrls(parsed);
-                toast.success(`Parsed URLs for ${parsed.length} NFTs`);
+                if (parsed.length > 0) {
+                    toast.success(`Parsed URLs for ${parsed.length} NFTs`);
+                }
             }
         });
     };
@@ -160,6 +277,10 @@ export function MetadataManager() {
         } finally {
             setIsProcessing(false);
         }
+    };
+
+    const getFieldError = (field: string, errors: ValidationError[]): string | undefined => {
+        return errors.find(e => e.field === field)?.message;
     };
 
     return (
@@ -196,18 +317,62 @@ export function MetadataManager() {
                     <Card>
                         <CardHeader><CardTitle>Single Entry</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex gap-4">
-                                <Input placeholder="NFT ID" value={nftId} onChange={e => setNftId(e.target.value)} className="w-32" type="number" />
+                            <div className="space-y-2">
+                                <div className="flex gap-4">
+                                    <Input
+                                        placeholder="NFT ID"
+                                        value={nftId}
+                                        onChange={e => setNftId(e.target.value)}
+                                        className={`w-32 ${getFieldError("nftId", attributeValidation) ? "border-red-500" : ""}`}
+                                        type="number"
+                                        min="0"
+                                    />
+                                </div>
+                                {getFieldError("nftId", attributeValidation) && (
+                                    <p className="text-xs text-red-500 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" />
+                                        {getFieldError("nftId", attributeValidation)}
+                                    </p>
+                                )}
                             </div>
                             {attributes.map((attr, i) => (
-                                <div key={i} className="flex gap-4">
-                                    <Input placeholder="Trait Type" value={attr.key} onChange={e => handleAttributeChange(i, "key", e.target.value)} />
-                                    <Input placeholder="Value" value={attr.value} onChange={e => handleAttributeChange(i, "value", e.target.value)} />
-                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveAttributeField(i)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                                <div key={i} className="space-y-1">
+                                    <div className="flex gap-4">
+                                        <Input
+                                            placeholder="Trait Type"
+                                            value={attr.key}
+                                            onChange={e => handleAttributeChange(i, "key", e.target.value)}
+                                            className={getFieldError(`trait-key-${i}`, attributeValidation) ? "border-red-500" : ""}
+                                        />
+                                        <Input
+                                            placeholder="Value"
+                                            value={attr.value}
+                                            onChange={e => handleAttributeChange(i, "value", e.target.value)}
+                                            className={getFieldError(`trait-value-${i}`, attributeValidation) ? "border-red-500" : ""}
+                                        />
+                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveAttributeField(i)}>
+                                            <Trash2 className="w-4 h-4 text-red-500" />
+                                        </Button>
+                                    </div>
+                                    {(getFieldError(`trait-key-${i}`, attributeValidation) || getFieldError(`trait-value-${i}`, attributeValidation)) && (
+                                        <p className="text-xs text-red-500 flex items-center gap-1">
+                                            <AlertCircle className="w-3 h-3" />
+                                            {getFieldError(`trait-key-${i}`, attributeValidation) || getFieldError(`trait-value-${i}`, attributeValidation)}
+                                        </p>
+                                    )}
                                 </div>
                             ))}
-                            <Button variant="outline" size="sm" onClick={handleAddAttributeField}><Plus className="w-4 h-4 mr-2" /> Add Trait</Button>
-                            <Button onClick={handleSubmitSingleAttributes} disabled={isProcessing} className="w-full">Save Attributes</Button>
+                            <Button variant="outline" size="sm" onClick={handleAddAttributeField}>
+                                <Plus className="w-4 h-4 mr-2" /> Add Trait
+                            </Button>
+                            <Button
+                                onClick={handleSubmitSingleAttributes}
+                                disabled={isProcessing || !canSubmitAttributes}
+                                className="w-full"
+                            >
+                                {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                                Save Attributes
+                            </Button>
                         </CardContent>
                     </Card>
 
@@ -220,6 +385,7 @@ export function MetadataManager() {
                             </div>
                             {bulkAttributes.length > 0 && (
                                 <Button onClick={handleSubmitBulkAttributes} disabled={isProcessing} className="w-full">
+                                    {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                                     Upload {bulkAttributes.length} Metadata Entries
                                 </Button>
                             )}
@@ -231,11 +397,38 @@ export function MetadataManager() {
                     <Card>
                         <CardHeader><CardTitle>Single URL</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex gap-4">
-                                <Input placeholder="NFT ID" value={urlNftId} onChange={e => setUrlNftId(e.target.value)} className="w-32" type="number" />
-                                <Input placeholder="Image/Metadata URL" value={url} onChange={e => setUrl(e.target.value)} className="flex-1" />
+                            <div className="space-y-2">
+                                <div className="flex gap-4">
+                                    <Input
+                                        placeholder="NFT ID"
+                                        value={urlNftId}
+                                        onChange={e => setUrlNftId(e.target.value)}
+                                        className={`w-32 ${getFieldError("urlNftId", urlValidation) ? "border-red-500" : ""}`}
+                                        type="number"
+                                        min="0"
+                                    />
+                                    <Input
+                                        placeholder="Image/Metadata URL (https://, ipfs://, ar://)"
+                                        value={url}
+                                        onChange={e => setUrl(e.target.value)}
+                                        className={`flex-1 ${getFieldError("url", urlValidation) ? "border-red-500" : ""}`}
+                                    />
+                                </div>
+                                {(getFieldError("urlNftId", urlValidation) || getFieldError("url", urlValidation)) && (
+                                    <p className="text-xs text-red-500 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" />
+                                        {getFieldError("urlNftId", urlValidation) || getFieldError("url", urlValidation)}
+                                    </p>
+                                )}
                             </div>
-                            <Button onClick={handleSubmitSingleUrl} disabled={isProcessing} className="w-full">Save URL</Button>
+                            <Button
+                                onClick={handleSubmitSingleUrl}
+                                disabled={isProcessing || !canSubmitUrl}
+                                className="w-full"
+                            >
+                                {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                                Save URL
+                            </Button>
                         </CardContent>
                     </Card>
 
@@ -248,6 +441,7 @@ export function MetadataManager() {
                             </div>
                             {bulkUrls.length > 0 && (
                                 <Button onClick={handleSubmitBulkUrls} disabled={isProcessing} className="w-full">
+                                    {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                                     Upload {bulkUrls.length} URLs
                                 </Button>
                             )}

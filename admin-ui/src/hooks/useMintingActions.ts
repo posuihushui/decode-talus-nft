@@ -1,7 +1,7 @@
 "use client";
 
 import { Transaction } from "@mysten/sui/transactions";
-import { NETWORK_CONFIG } from "@/config/network";
+import { NETWORK } from "@/config/network";
 import { useCallback } from "react";
 import { useExecuteTransaction } from "./useExecuteTransaction";
 
@@ -11,10 +11,10 @@ export function useMintingActions() {
   const startMinting = useCallback(async () => {
     const tx = new Transaction();
     tx.moveCall({
-      target: `${NETWORK_CONFIG.testnet.packageId}::nft::start_minting`,
+      target: `${NETWORK.packageId}::nft::start_minting`,
       arguments: [
-        tx.object(NETWORK_CONFIG.testnet.adminCapId),
-        tx.object(NETWORK_CONFIG.testnet.registryId),
+        tx.object(NETWORK.adminCapId),
+        tx.object(NETWORK.registryId),
       ],
     });
     return executeTransaction(tx, "Public minting started");
@@ -23,10 +23,10 @@ export function useMintingActions() {
   const stopMinting = useCallback(async () => {
     const tx = new Transaction();
     tx.moveCall({
-      target: `${NETWORK_CONFIG.testnet.packageId}::nft::stop_minting`,
+      target: `${NETWORK.packageId}::nft::stop_minting`,
       arguments: [
-        tx.object(NETWORK_CONFIG.testnet.adminCapId),
-        tx.object(NETWORK_CONFIG.testnet.registryId),
+        tx.object(NETWORK.adminCapId),
+        tx.object(NETWORK.registryId),
       ],
     });
     return executeTransaction(tx, "Public minting stopped");
@@ -35,11 +35,11 @@ export function useMintingActions() {
   const startTrading = useCallback(async () => {
     const tx = new Transaction();
     tx.moveCall({
-      target: `${NETWORK_CONFIG.testnet.packageId}::nft::start_trading`,
+      target: `${NETWORK.packageId}::nft::start_trading`,
       arguments: [
-        tx.object(NETWORK_CONFIG.testnet.adminCapId),
-        tx.object(NETWORK_CONFIG.testnet.transferPolicyId),
-        tx.object(NETWORK_CONFIG.testnet.transferPolicyCapId),
+        tx.object(NETWORK.adminCapId),
+        tx.object(NETWORK.transferPolicyId),
+        tx.object(NETWORK.transferPolicyCapId),
       ],
     });
     return executeTransaction(tx, "Trading enabled");
@@ -48,12 +48,12 @@ export function useMintingActions() {
   const mintAdmin = useCallback(async (amount: number, kioskId: string, kioskCapId: string) => {
     const tx = new Transaction();
     tx.moveCall({
-      target: `${NETWORK_CONFIG.testnet.packageId}::nft::mint_tally_admin`,
+      target: `${NETWORK.packageId}::nft::mint_tally_admin`,
       arguments: [
-        tx.object(NETWORK_CONFIG.testnet.adminCapId),
-        tx.object(NETWORK_CONFIG.testnet.registryId),
+        tx.object(NETWORK.adminCapId),
+        tx.object(NETWORK.registryId),
         tx.pure.u64(amount),
-        tx.object(NETWORK_CONFIG.testnet.transferPolicyId),
+        tx.object(NETWORK.transferPolicyId),
         tx.object(kioskId),
         tx.object(kioskCapId),
       ],

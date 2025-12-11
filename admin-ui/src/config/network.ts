@@ -2,7 +2,7 @@ import { getFullnodeUrl } from "@mysten/sui/client";
 
 export const NETWORK_CONFIG = {
   testnet: {
-    network: "testnet",
+    network: "testnet" as const,
     rpcUrl: getFullnodeUrl("testnet"),
     packageId: "0x01da5a22ea61747c242789f29b9e825380fc043808a56a3d61b36913086be43f",
     registryId: "0x89e0c22e871788d06340b9c211fa204e74d018fe6d3afba96196035cd16d6c0d",
@@ -12,7 +12,7 @@ export const NETWORK_CONFIG = {
     adminCapId: "0xa715bb53c23652929e81c516940e05d6cf0821d989ef6561a279078db5a27793",
   },
   mainnet: {
-    network: "mainnet",
+    network: "mainnet" as const,
     rpcUrl: getFullnodeUrl("mainnet"),
     packageId: "",
     registryId: "",
@@ -22,5 +22,11 @@ export const NETWORK_CONFIG = {
     adminCapId: "",
   },
 };
+
+// Default network based on environment variable
+const defaultNetwork = (process.env.NEXT_PUBLIC_DEFAULT_NETWORK as "testnet" | "mainnet") || "testnet";
+
+// Export NETWORK for simpler usage
+export const NETWORK = NETWORK_CONFIG[defaultNetwork];
 
 export type NetworkConfig = typeof NETWORK_CONFIG.testnet;

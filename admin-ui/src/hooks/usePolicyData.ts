@@ -1,7 +1,7 @@
 "use client";
 
 import { useSuiClientQuery } from "@mysten/dapp-kit";
-import { NETWORK_CONFIG } from "@/config/network";
+import { NETWORK } from "@/config/network";
 
 export interface PolicyData {
   royaltyBalance: number;
@@ -11,13 +11,13 @@ export function usePolicyData() {
   const { data, isLoading, error, refetch } = useSuiClientQuery(
     "getObject",
     {
-      id: NETWORK_CONFIG.testnet.transferPolicyId,
+      id: NETWORK.transferPolicyId,
       options: {
         showContent: true,
       },
     },
     {
-      enabled: !!NETWORK_CONFIG.testnet.transferPolicyId,
+      enabled: !!NETWORK.transferPolicyId,
     }
   );
 
